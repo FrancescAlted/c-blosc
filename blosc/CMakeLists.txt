@@ -36,6 +36,15 @@ if(NOT DEACTIVATE_ZLIB)
     endif(ZLIB_FOUND)
 endif(NOT DEACTIVATE_ZLIB)
 
+if(NOT DEACTIVATE_DENSITY)
+    if (DENSITY_FOUND)
+        include_directories( ${DENSITY_INCLUDE_DIR} )
+    else(DENSITY_FOUND)
+        set(DENSITY_LOCAL_DIR ${INTERNAL_LIBS}/density-0.12.5beta)
+        include_directories( ${DENSITY_LOCAL_DIR} )
+    endif(DENSITY_FOUND)
+endif(NOT DEACTIVATE_DENSITY)
+
 # library sources
 set(SOURCES blosc.c blosclz.c shuffle-generic.c)
 if(COMPILER_SUPPORT_SSE2)
@@ -93,6 +102,16 @@ if(NOT DEACTIVATE_ZLIB)
         set(SOURCES ${SOURCES} ${ZLIB_FILES})
     endif(ZLIB_FOUND)
 endif(NOT DEACTIVATE_ZLIB)
+
+if(NOT DEACTIVATE_DENSITY)
+    if(DENSITY_FOUND)
+        set(LIBS ${LIBS} ${DENSITY_LIBRARY})
+        message(STATUS "DENSITY LIBS: ${DENSITY_LIBRARY}")
+    else(DENSITY_FOUND)
+        file(GLOB DENSITY_FILES ${DENSITY_LOCAL_DIR}/*.c)
+        set(SOURCES ${SOURCES} ${DENSITY_FILES})
+    endif(DENSITY_FOUND)
+endif(NOT DEACTIVATE_DENSITY)
 
 # targets
 add_library(blosc_shared SHARED ${SOURCES})

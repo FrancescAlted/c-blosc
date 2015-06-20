@@ -361,6 +361,8 @@ void print_compress_info(void)
   if (ret >= 0) printf("  %s: %s\n", name, version);
   ret = blosc_get_complib_info("zlib", &name, &version);
   if (ret >= 0) printf("  %s: %s\n", name, version);
+  ret = blosc_get_complib_info("density", &name, &version);
+  if (ret >= 0) printf("  %s: %s\n", name, version);
 
 }
 
@@ -386,7 +388,8 @@ int main(int argc, char *argv[]) {
 
   print_compress_info();
 
-  strncpy(usage, "Usage: bench [blosclz | lz4 | lz4hc | snappy | zlib] "
+  strncpy(usage,
+	  "Usage: bench [blosclz | lz4 | lz4hc | snappy | zlib | density] "
           "[[single | suite | hardsuite | extremesuite | debugsuite] "
           "[nthreads [bufsize(bytes) [typesize [sbits ]]]]]", 255);
 
@@ -401,7 +404,8 @@ int main(int argc, char *argv[]) {
       strcmp(compressor, "lz4") != 0 &&
       strcmp(compressor, "lz4hc") != 0 &&
       strcmp(compressor, "snappy") != 0 &&
-      strcmp(compressor, "zlib") != 0) {
+      strcmp(compressor, "zlib") != 0 &&
+      strcmp(compressor, "density") != 0) {
     printf("No such compressor: '%s'\n", compressor);
     exit(2);
   }

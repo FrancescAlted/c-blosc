@@ -29,6 +29,9 @@
 #if defined(HAVE_ZLIB)
   #include "zlib.h"
 #endif /*  HAVE_ZLIB */
+#if defined(HAVE_DENSITY)
+  #include "density_api.h"
+#endif /*  HAVE_DENSITY */
 
 #if defined(_WIN32) && !defined(__MINGW32__)
   #include <windows.h>
@@ -303,6 +306,8 @@ static int compname_to_clibcode(const char *compname)
     return BLOSC_SNAPPY_LIB;
   if (strcmp(compname, BLOSC_ZLIB_COMPNAME) == 0)
     return BLOSC_ZLIB_LIB;
+  if (strcmp(compname, BLOSC_DENSITY_COMPNAME) == 0)
+    return BLOSC_DENSITY_LIB;
   return -1;
 }
 
@@ -313,6 +318,7 @@ static char *clibcode_to_clibname(int clibcode)
   if (clibcode == BLOSC_LZ4_LIB) return BLOSC_LZ4_LIBNAME;
   if (clibcode == BLOSC_SNAPPY_LIB) return BLOSC_SNAPPY_LIBNAME;
   if (clibcode == BLOSC_ZLIB_LIB) return BLOSC_ZLIB_LIBNAME;
+  if (clibcode == BLOSC_DENSITY_LIB) return BLOSC_DENSITY_LIBNAME;
   return NULL;			/* should never happen */
 }
 
@@ -338,6 +344,8 @@ int blosc_compcode_to_compname(int compcode, char **compname)
     name = BLOSC_SNAPPY_COMPNAME;
   else if (compcode == BLOSC_ZLIB)
     name = BLOSC_ZLIB_COMPNAME;
+  else if (compcode == BLOSC_DENSITY)
+    name = BLOSC_DENSITY_COMPNAME;
 
   *compname = name;
 
@@ -358,9 +366,14 @@ int blosc_compcode_to_compname(int compcode, char **compname)
   else if (compcode == BLOSC_ZLIB)
     code = BLOSC_ZLIB;
 #endif /*  HAVE_ZLIB */
+#if defined(HAVE_DENSITY)
+  else if (compcode == BLOSC_DENSITY)
+    code = BLOSC_DENSITY;
+#endif /*  HAVE_DENSITY */
 
   return code;
 }
+
 
 /* Get the compressor code for the compressor name. -1 if it is not available */
 int blosc_compname_to_compcode(const char *compname)
@@ -388,6 +401,11 @@ int blosc_compname_to_compcode(const char *compname)
     code = BLOSC_ZLIB;
   }
 #endif /*  HAVE_ZLIB */
+#if defined(HAVE_DENSITY)
+  else if (strcmp(compname, BLOSC_DENSITY_COMPNAME) == 0) {
+    code = BLOSC_DENSITY;
+  }
+#endif /*  HAVE_DENSITY */
 
 return code;
 }
@@ -425,7 +443,6 @@ static int lz4_wrap_decompress(const char* input, size_t compressed_length,
   }
   return (int)maxout;
 }
-
 #endif /* HAVE_LZ4 */
 
 #if defined(HAVE_SNAPPY)
@@ -482,8 +499,39 @@ static int zlib_wrap_decompress(const char* input, size_t compressed_length,
   }
   return (int)ul;
 }
-
 #endif /*  HAVE_ZLIB */
+
+#if defined(HAVE_DENSITY)
+static int density_wrap_compress(const char* input, size_t input_length,
+                                 char* output, size_t maxout, int clevel)
+{
+  density_buffer_processing_result result;
+  result = density_buffer_compress(
+      (uint8_t *)input, (uint_fast64_t)input_length,
+      (uint8_t *)output, (uint_fast64_t)maxout,
+      DENSITY_COMPRESSION_MODE_CHEETAH_ALGORITHM,
+      DENSITY_BLOCK_TYPE_DEFAULT, NULL, NULL);
+  if (result.state){
+    return 0;
+  }
+  return (int)result.bytesWritten;
+}
+
+static int density_wrap_decompress(const char* input, size_t compressed_length,
+                                   char* output, size_t maxout)
+{
+  density_buffer_processing_result result;
+  result = density_buffer_decompress(
+     (uint8_t *)input, (uint_fast64_t)compressed_length,
+     (uint8_t *)output, (uint_fast64_t)maxout,
+     NULL, NULL);
+  if (result.state){
+    return 0;
+  }
+  return (int)result.bytesWritten;
+}
+#endif /*  HAVE_DENSITY */
+
 
 /* Compute acceleration for blosclz */
 static int get_accel(const struct blosc_context* context) {
@@ -566,31 +614,43 @@ static int blosc_c(const struct blosc_context* context, int32_t blocksize,
       }
     }
     if (context->compcode == BLOSC_BLOSCLZ) {
-      cbytes = blosclz_compress(context->clevel, _tmp+j*neblock, neblock,
-                                dest, maxout, accel);
+      cbytes = blosclz_compress(
+          context->clevel, _tmp+j*neblock, neblock,
+	  dest, maxout, accel);
     }
     #if defined(HAVE_LZ4)
     else if (context->compcode == BLOSC_LZ4) {
-      cbytes = lz4_wrap_compress((char *)_tmp+j*neblock, (size_t)neblock,
-                                 (char *)dest, (size_t)maxout, accel);
+      cbytes = lz4_wrap_compress(
+          (char *)_tmp+j*neblock, (size_t)neblock,
+	  (char *)dest, (size_t)maxout, accel);
     }
     else if (context->compcode == BLOSC_LZ4HC) {
-      cbytes = lz4hc_wrap_compress((char *)_tmp+j*neblock, (size_t)neblock,
-                                   (char *)dest, (size_t)maxout, context->clevel);
+      cbytes = lz4hc_wrap_compress(
+          (char *)_tmp+j*neblock, (size_t)neblock,
+	  (char *)dest, (size_t)maxout, context->clevel);
     }
     #endif /*  HAVE_LZ4 */
     #if defined(HAVE_SNAPPY)
     else if (context->compcode == BLOSC_SNAPPY) {
-      cbytes = snappy_wrap_compress((char *)_tmp+j*neblock, (size_t)neblock,
-                                    (char *)dest, (size_t)maxout);
+      cbytes = snappy_wrap_compress(
+          (char *)_tmp+j*neblock, (size_t)neblock,
+	  (char *)dest, (size_t)maxout);
     }
     #endif /*  HAVE_SNAPPY */
     #if defined(HAVE_ZLIB)
     else if (context->compcode == BLOSC_ZLIB) {
-      cbytes = zlib_wrap_compress((char *)_tmp+j*neblock, (size_t)neblock,
-                                  (char *)dest, (size_t)maxout, context->clevel);
+      cbytes = zlib_wrap_compress(
+          (char *)_tmp+j*neblock, (size_t)neblock,
+	  (char *)dest, (size_t)maxout, context->clevel);
     }
     #endif /*  HAVE_ZLIB */
+    #if defined(HAVE_DENSITY)
+    else if (context->compcode == BLOSC_DENSITY) {
+      cbytes = density_wrap_compress(
+          (char *)_tmp+j*neblock, (size_t)neblock,
+	  (char *)dest, (size_t)maxout, context->clevel);
+    }
+    #endif /*  HAVE_DENSITY */
 
     else {
       blosc_compcode_to_compname(context->compcode, &compname);
@@ -689,6 +749,12 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize, int32_t lef
                                       (char*)_tmp, (size_t)neblock);
       }
       #endif /*  HAVE_ZLIB */
+      #if defined(HAVE_DENSITY)
+      else if (compcode == BLOSC_DENSITY_FORMAT) {
+        nbytes = density_wrap_decompress((char *)src, (size_t)cbytes,
+                                         (char*)_tmp, (size_t)neblock);
+      }
+      #endif /*  HAVE_DENSITY */
       else {
         blosc_compcode_to_compname(compcode, &compname);
         fprintf(stderr,
@@ -1035,6 +1101,13 @@ static int write_compression_header(struct blosc_context* context, int clevel, i
     context->dest[1] = BLOSC_ZLIB_VERSION_FORMAT;      /* zlib format version */
     break;
 #endif /*  HAVE_ZLIB */
+
+#if defined(HAVE_DENSITY)
+  case BLOSC_DENSITY:
+    compcode = BLOSC_DENSITY_FORMAT;
+    context->dest[1] = BLOSC_DENSITY_VERSION_FORMAT;   /* density format version */
+    break;
+#endif /*  HAVE_DENSITY */
 
   default:
   {
@@ -1697,6 +1770,9 @@ char* blosc_list_compressors(void)
 #if defined(HAVE_ZLIB)
   strcat(ret, ","); strcat(ret, BLOSC_ZLIB_COMPNAME);
 #endif /*  HAVE_ZLIB */
+#if defined(HAVE_DENSITY)
+  strcat(ret, ","); strcat(ret, BLOSC_DENSITY_COMPNAME);
+#endif /*  HAVE_DENSITY */
   compressors_list_done = 1;
   return ret;
 }
@@ -1747,6 +1823,15 @@ int blosc_get_complib_info(char *compname, char **complib, char **version)
     clibversion = ZLIB_VERSION;
   }
 #endif /*  HAVE_ZLIB */
+#if defined(HAVE_DENSITY)
+  else if (clibcode == BLOSC_DENSITY_LIB) {
+    sprintf(sbuffer, "%d.%d.%d",
+	    density_version_major(),
+	    density_version_minor(),
+	    density_version_revision());
+    clibversion = sbuffer;
+  }
+#endif /*  DENSITY_VERSION */
 
   *complib = strdup(clibname);
   *version = strdup(clibversion);

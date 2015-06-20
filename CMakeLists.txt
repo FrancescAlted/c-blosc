@@ -15,6 +15,8 @@
 #       do not include support for the Snappy library
 #   DEACTIVATE_ZLIB: default OFF
 #       do not include support for the Zlib library
+#   DEACTIVATE_DENSITY: default OFF
+#       do not include support for the Density library
 #   PREFER_EXTERNAL_COMPLIBS: default ON
 #       when found, use the installed compression libs instead of included sources
 #   TEST_INCLUDE_BENCH_SINGLE_1: default ON
@@ -74,6 +76,8 @@ option(DEACTIVATE_SNAPPY
     "Do not include support for the SNAPPY library." OFF)
 option(DEACTIVATE_ZLIB
     "Do not include support for the ZLIB library." OFF)
+option(DEACTIVATE_DENSITY
+    "Do not include support for the DENSITY library." OFF)
 option(PREFER_EXTERNAL_COMPLIBS
     "When found, use the installed compression libs instead of included sources." ON)
 
@@ -106,7 +110,7 @@ if(NOT DEACTIVATE_ZLIB)
     # import the ZLIB_ROOT environment variable to help finding the zlib library
     if(PREFER_EXTERNAL_COMPLIBS)
         set(ZLIB_ROOT $ENV{ZLIB_ROOT})
-        find_package( ZLIB )
+        find_package(ZLIB)
         if (NOT ZLIB_FOUND )
             message(STATUS "No zlib found.  Using internal sources.")
         endif (NOT ZLIB_FOUND )
@@ -115,6 +119,15 @@ if(NOT DEACTIVATE_ZLIB)
     # we will use the included sources for it
     set(HAVE_ZLIB TRUE)
 endif(NOT DEACTIVATE_ZLIB)
+
+if(NOT DEACTIVATE_DENSITY)
+    if(PREFER_EXTERNAL_COMPLIBS)
+        find_package(DENSITY)
+    endif(PREFER_EXTERNAL_COMPLIBS)
+    # HAVE_DENSITY will be set to true because even if the library is not found,
+    # we will use the included sources for it
+    set(HAVE_DENSITY TRUE)
+endif(NOT DEACTIVATE_DENSITY)
 
 # create the config.h file
 configure_file ("blosc/config.h.in"  "blosc/config.h" )
