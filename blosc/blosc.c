@@ -509,7 +509,7 @@ static int density_wrap_compress(const char* input, size_t input_length,
   result = density_buffer_compress(
       (uint8_t *)input, (uint_fast64_t)input_length,
       (uint8_t *)output, (uint_fast64_t)maxout,
-      DENSITY_COMPRESSION_MODE_CHEETAH_ALGORITHM,
+      DENSITY_COMPRESSION_MODE_CHAMELEON_ALGORITHM,
       DENSITY_BLOCK_TYPE_DEFAULT, NULL, NULL);
   if (result.state){
     return 0;
