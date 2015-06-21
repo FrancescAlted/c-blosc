@@ -506,11 +506,25 @@ static int density_wrap_compress(const char* input, size_t input_length,
                                  char* output, size_t maxout, int clevel)
 {
   density_buffer_processing_result result;
+  DENSITY_COMPRESSION_MODE mode;
+  switch(clevel) {
+  default:
+    mode = DENSITY_COMPRESSION_MODE_CHAMELEON_ALGORITHM;
+    break;
+  case 6:
+  case 7:
+  case 8:
+    mode = DENSITY_COMPRESSION_MODE_CHEETAH_ALGORITHM;
+    break;
+  case 9:
+    mode = DENSITY_COMPRESSION_MODE_LION_ALGORITHM;
+    break;
+  }
+
   result = density_buffer_compress(
       (uint8_t *)input, (uint_fast64_t)input_length,
       (uint8_t *)output, (uint_fast64_t)maxout,
-      DENSITY_COMPRESSION_MODE_CHAMELEON_ALGORITHM,
-      DENSITY_BLOCK_TYPE_DEFAULT, NULL, NULL);
+      mode, DENSITY_BLOCK_TYPE_DEFAULT, NULL, NULL);
   if (result.state){
     return 0;
   }
@@ -521,9 +535,12 @@ static int density_wrap_decompress(const char* input, size_t compressed_length,
                                    char* output, size_t maxout)
 {
   density_buffer_processing_result result;
+  /* maxout size + 2**16 is a temporary workaround.  See:
+   * https://github.com/centaurean/density/issues/47
+   */
   result = density_buffer_decompress(
      (uint8_t *)input, (uint_fast64_t)compressed_length,
-     (uint8_t *)output, (uint_fast64_t)maxout,
+     (uint8_t *)output, (uint_fast64_t)maxout + (1 << 16),
      NULL, NULL);
   if (result.state){
     return 0;
@@ -915,7 +932,9 @@ static int do_job(struct blosc_context* context)
 }
 
 
-static int32_t compute_blocksize(struct blosc_context* context, int32_t clevel, int32_t typesize, int32_t nbytes, int32_t forced_blocksize)
+static int32_t compute_blocksize(struct blosc_context* context, int32_t clevel,
+				 int32_t typesize, int32_t nbytes,
+				 int32_t forced_blocksize)
 {
   int32_t blocksize;
 
@@ -936,17 +955,16 @@ static int32_t compute_blocksize(struct blosc_context* context, int32_t clevel, 
   else if (nbytes >= L1 * typesize) {
     blocksize = L1 * typesize;
 
-    /* For Zlib, increase the block sizes in a factor of 8 because it
-       is meant for compression large blocks (it shows a big overhead
-       in compressing small ones). */
+    /* For certain codecs, increase the block sizes because they are
+       meant for compressing large blocks and they show a big overhead
+       in compressing small ones. */
     if (context->compcode == BLOSC_ZLIB) {
       blocksize *= 8;
     }
-
-    /* For LZ4HC, increase the block sizes in a factor of 8 because it
-       is meant for compression large blocks (it shows a big overhead
-       in compressing small ones). */
     if (context->compcode == BLOSC_LZ4HC) {
+      blocksize *= 8;
+    }
+    if (context->compcode == BLOSC_DENSITY) {
       blocksize *= 8;
     }
 
